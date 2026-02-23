@@ -70,44 +70,13 @@ export function getAvailableCommands(): string {
       title: 'File Commands',
       commands: [
         '• `/file <path>` \\- Download a file from project',
-        '• `/telegraph <path>` \\- View markdown with Instant View',
       ],
     },
   ];
 
-  const redditCommands: string[] = [];
-  if (config.REDDIT_ENABLED) {
-    redditCommands.push('• `/reddit <target>` \\- Fetch Reddit posts, subreddits, or user profiles');
-  }
-  if (config.VREDDIT_ENABLED) {
-    redditCommands.push('• `/vreddit <url>` \\- Download Reddit\\-hosted video from a post URL');
-  }
-  if (redditCommands.length > 0) {
-    sections.push({ title: 'Reddit Commands', commands: redditCommands });
-  }
-
-  if (config.MEDIUM_ENABLED) {
-    sections.push({
-      title: 'Medium Commands',
-      commands: ['• `/medium <url>` \\- Fetch Medium article with images'],
-    });
-  }
-
-  const mediaCommands: string[] = [];
-  if (config.EXTRACT_ENABLED) {
-    mediaCommands.push('• `/extract <url>` \\- Extract text/audio/video from YouTube, Instagram, TikTok');
-  }
-  if (config.TRANSCRIBE_ENABLED) {
-    mediaCommands.push('• `/transcribe` \\- Transcribe audio to text \\(reply to voice/audio, or ForceReply\\)');
-  }
-  if (mediaCommands.length > 0) {
-    sections.push({ title: 'Media Commands', commands: mediaCommands });
-  }
-
   sections.push({
     title: 'Bot Commands',
     commands: [
-      '• `/tts` \\- Toggle voice replies',
       '• `/context` \\- Show Claude context usage',
       '• `/botstatus` \\- Show bot process status',
       '• `/restartbot` \\- Restart the bot process',

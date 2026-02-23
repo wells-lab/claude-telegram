@@ -20,9 +20,7 @@ const envSchema = z.object({
     .string()
     .default('')
     .transform((val) => val ? val.split(',').map((id) => parseInt(id.trim(), 10)) : []),
-  ANTHROPIC_API_KEY: z.string().optional(), // Optional - uses Claude Max subscription if not set
-  // OpenAI (TTS)
-  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
   WORKSPACE_DIR: z.string().default(process.env.HOME || '.'),
   CLAUDE_EXECUTABLE_PATH: z.string().default('claude'),
   CLAUDE_USE_BUNDLED_EXECUTABLE: z
@@ -49,21 +47,6 @@ const envSchema = z.object({
     .string()
     .default('4000')
     .transform((val) => parseInt(val, 10)),
-  // TTS Configuration
-  TTS_ENABLED: z.string().default('true').transform(toBool),
-  TTS_PROVIDER: z.enum(['groq', 'openai']).default('groq'),
-  TTS_MODEL: z.string().default('gpt-4o-mini-tts'),
-  TTS_VOICE: z.string().default('coral'),
-  TTS_INSTRUCTIONS: z.string().default('Speak in a friendly, natural conversational tone.'),
-  TTS_SPEED: z
-    .string()
-    .default('1.0')
-    .transform((val) => parseFloat(val)),
-  TTS_MAX_CHARS: z
-    .string()
-    .default('4096')
-    .transform((val) => parseInt(val, 10)),
-  TTS_RESPONSE_FORMAT: z.string().default('opus'),
   IMAGE_MAX_FILE_SIZE_MB: z
     .string()
     .default('20')
@@ -76,84 +59,6 @@ const envSchema = z.object({
   MAX_LOOP_ITERATIONS: z
     .string()
     .default('5')
-    .transform((val) => parseInt(val, 10)),
-  REDDITFETCH_JSON_THRESHOLD_CHARS: z
-    .string()
-    .default('8000')
-    .transform((val) => parseInt(val, 10)),
-  // Reddit API credentials (native TypeScript module)
-  REDDIT_CLIENT_ID: z.string().optional(),
-  REDDIT_CLIENT_SECRET: z.string().optional(),
-  REDDIT_USERNAME: z.string().optional(),
-  REDDIT_PASSWORD: z.string().optional(),
-  // Reddit fetch configuration
-  REDDIT_ENABLED: z.string().default('true').transform(toBool),
-  // DEPRECATED: REDDITFETCH_PATH — replaced by native TypeScript module; kept for reference only
-  REDDITFETCH_PATH: z.string().default(''),
-  REDDITFETCH_TIMEOUT_MS: z
-    .string()
-    .default('30000')
-    .transform((val) => parseInt(val, 10)),
-  REDDITFETCH_DEFAULT_LIMIT: z
-    .string()
-    .default('10')
-    .transform((val) => parseInt(val, 10)),
-  REDDITFETCH_DEFAULT_DEPTH: z
-    .string()
-    .default('5')
-    .transform((val) => parseInt(val, 10)),
-  // Reddit video download
-  VREDDIT_ENABLED: z.string().default('true').transform(toBool),
-  REDDIT_VIDEO_MAX_SIZE_MB: z
-    .string()
-    .default('50')
-    .transform((val) => parseInt(val, 10)),
-  // Telegraph (Instant View for long messages)
-  TELEGRAPH_ENABLED: z.string().default('true').transform(toBool),
-  // Medium / Freedium configuration
-  MEDIUM_ENABLED: z.string().default('true').transform(toBool),
-  MEDIUM_TIMEOUT_MS: z
-    .string()
-    .default('15000')
-    .transform((val) => parseInt(val, 10)),
-  MEDIUM_FILE_THRESHOLD_CHARS: z
-    .string()
-    .default('8000')
-    .transform((val) => parseInt(val, 10)),
-  FREEDIUM_HOST: z.string().default('freedium-mirror.cfd'),
-  FREEDIUM_RATE_LIMIT_MS: z
-    .string()
-    .default('2000')
-    .transform((val) => parseInt(val, 10)),
-  // Voice transcription (Groq Whisper)
-  GROQ_API_KEY: z.string().optional(),
-  GROQ_TRANSCRIBE_PATH: z.string().default(''),
-  TRANSCRIBE_ENABLED: z.string().default('true').transform(toBool),
-  VOICE_SHOW_TRANSCRIPT: z
-    .string()
-    .default('true')
-    .transform((val) => val.toLowerCase() === 'true'),
-  VOICE_MAX_FILE_SIZE_MB: z
-    .string()
-    .default('19')
-    .transform((val) => parseInt(val, 10)),
-  VOICE_LANGUAGE: z.string().default('en'),
-  VOICE_TIMEOUT_MS: z
-    .string()
-    .default('60000')
-    .transform((val) => parseInt(val, 10)),
-  // Transcribe command: send .txt file if transcript exceeds this many chars
-  TRANSCRIBE_FILE_THRESHOLD_CHARS: z
-    .string()
-    .default('4000')
-    .transform((val) => parseInt(val, 10)),
-  // Media extraction (/extract command)
-  EXTRACT_ENABLED: z.string().default('true').transform(toBool),
-  YTDLP_COOKIES_PATH: z.string().default(''),
-  YTDLP_PROXY_LIST_PATH: z.string().default(''),
-  EXTRACT_TRANSCRIBE_TIMEOUT_MS: z
-    .string()
-    .default('180000')
     .transform((val) => parseInt(val, 10)),
   // Context visibility
   CONTEXT_SHOW_USAGE: z

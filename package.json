@@ -1,5 +1,5 @@
 {
-  "name": "claudegram",
+  "name": "claude-telegram",
   "version": "1.0.0",
   "description": "Telegram bot that bridges messages to Claude Code with full agent capabilities",
   "type": "module",
@@ -23,13 +23,9 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.44",
     "@grammyjs/auto-retry": "^2.0.2",
     "@grammyjs/runner": "^2.0.3",
-    "@types/turndown": "^5.0.6",
-    "cheerio": "^1.2.0",
     "dotenv": "^16.4.7",
     "grammy": "^1.31.3",
-    "openai": "^6.16.0",
     "telegram-markdown-v2": "^0.0.4",
-    "turndown": "^7.2.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

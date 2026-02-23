@@ -15,36 +15,11 @@ import {
 } from '../../claude/request-queue.js';
 import { isClaudeCommand } from '../../claude/command-parser.js';
 import { escapeMarkdownV2 as esc } from '../../telegram/markdown.js';
-import { createTelegraphFromFile } from '../../telegram/telegraph.js';
-import { getStreamingMode, executeRedditFetch, executeMediumFetch, showExtractMenu, projectStatusSuffix, resumeCommandMessage } from './command.handler.js';
-import { executeVReddit } from '../../reddit/vreddit.js';
-import { detectPlatform, isValidUrl } from '../../media/extract.js';
-import { maybeSendVoiceReply } from '../../tts/voice-reply.js';
+import { getStreamingMode, projectStatusSuffix, resumeCommandMessage } from './command.handler.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getWorkspaceRoot, isPathWithinRoot } from '../../utils/workspace-guard.js';
 import { getSessionKeyFromCtx } from '../../utils/session-key.js';
-
-async function replyFeatureDisabled(ctx: Context, feature: string): Promise<void> {
-  await ctx.reply(`⚠️ ${feature} feature is disabled in configuration.`, { parse_mode: undefined });
-}
-
-
-function extractRedditUrl(text: string): string | null {
-  const matches = text.match(/https?:\/\/\S+/gi);
-  if (!matches) return null;
-  for (const match of matches) {
-    try {
-      const url = new URL(match);
-      if (url.hostname === 'reddit.com' || url.hostname.endsWith('.reddit.com') || url.hostname === 'redd.it' || url.hostname === 'v.redd.it') {
-        return match;
-      }
-    } catch {
-      // ignore malformed URLs
-    }
-  }
-  return null;
-}
 
 export function fmtTokens(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
@@ -91,7 +66,6 @@ async function sendCompactionNotification(
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('[Compaction] Failed to send notification:', err);
-    // Fallback to plain text if MarkdownV2 fails
     try {
       await ctx.reply(
         `${emoji} Context Compacted\n\n`
@@ -119,22 +93,6 @@ async function sendSessionInitNotification(
       + `_The agent may not remember earlier details\\. Consider sharing context\\._`;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   }
-}
-
-function getAutoVRedditUrl(text: string): string | null {
-  if (!config.VREDDIT_ENABLED) return null;
-
-  const trimmed = text.trim();
-  if (!trimmed || trimmed.startsWith('/')) return null;
-
-  const url = extractRedditUrl(trimmed);
-  if (!url) return null;
-
-  const tokens = trimmed.split(/\s+/);
-  const isSolo = tokens.length === 1;
-  const askedForVReddit = /\bvreddit\b|\bv\s*reddit\b/i.test(trimmed);
-
-  return isSolo || askedForVReddit ? url : null;
 }
 
 export async function handleMessage(ctx: Context): Promise<void> {
@@ -170,12 +128,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
       return;
     }
 
-    // Handle telegraph/instant view reply (check BEFORE file - both have "file path")
-    if (replyText.includes('Instant View') || replyText.includes('Markdown files')) {
-      await handleTelegraphReply(ctx, sessionKey, text);
-      return;
-    }
-
     // Handle file download reply
     if (replyText.includes('Download File')) {
       await handleFileReply(ctx, sessionKey, text);
@@ -199,59 +151,6 @@ export async function handleMessage(ctx: Context): Promise<void> {
       await handleAgentReply(ctx, sessionKey, text, 'loop');
       return;
     }
-
-    // Handle reddit fetch reply
-    if (replyText.includes('Reddit Fetch') || replyText.includes('Reddit target')) {
-      if (!config.REDDIT_ENABLED) {
-        await replyFeatureDisabled(ctx, 'Reddit');
-        return;
-      }
-      await executeRedditFetch(ctx, text.trim());
-      return;
-    }
-
-    // Handle Reddit video fetch reply
-    if (replyText.includes('Reddit Video')) {
-      if (!config.VREDDIT_ENABLED) {
-        await replyFeatureDisabled(ctx, 'Reddit video');
-        return;
-      }
-      await executeVReddit(ctx, text.trim());
-      return;
-    }
-
-    // Handle medium fetch reply
-    if (replyText.includes('Medium Fetch') || replyText.includes('Medium article')) {
-      if (!config.MEDIUM_ENABLED) {
-        await replyFeatureDisabled(ctx, 'Medium');
-        return;
-      }
-      await executeMediumFetch(ctx, text.trim());
-      return;
-    }
-
-    // Handle extract media reply
-    if (replyText.includes('Extract Media') || replyText.includes('Paste a URL')) {
-      if (!config.EXTRACT_ENABLED) {
-        await replyFeatureDisabled(ctx, 'Extract');
-        return;
-      }
-      await showExtractMenu(ctx, text.trim());
-      return;
-    }
-  }
-
-  const vRedditUrl = getAutoVRedditUrl(text);
-  if (vRedditUrl) {
-    await executeVReddit(ctx, vRedditUrl);
-    return;
-  }
-
-  // Auto-detect YouTube / TikTok / Instagram URLs sent as bare links → show extract menu
-  const trimmedText = text.trim();
-  if (config.EXTRACT_ENABLED && isValidUrl(trimmedText) && detectPlatform(trimmedText) !== 'unknown') {
-    await showExtractMenu(ctx, trimmedText);
-    return;
   }
 
   // Skip if this is a Claude command (handled by command handler)
@@ -467,7 +366,6 @@ async function handleAgentReply(
         }
 
         await messageSender.finishStreaming(ctx, response.text);
-        await maybeSendVoiceReply(ctx, response.text);
 
         // Context visibility notifications
         await sendUsageFooter(ctx, response.usage);
@@ -482,74 +380,6 @@ async function handleAgentReply(
     if ((error as Error).message === 'Queue cleared') return;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     await ctx.reply(`❌ Error: ${esc(errorMessage)}`, { parse_mode: 'MarkdownV2' });
-  }
-}
-
-// Handle reply to telegraph ForceReply prompt
-async function handleTelegraphReply(ctx: Context, sessionKey: string, filePath: string): Promise<void> {
-  const trimmedPath = filePath.trim();
-
-  const session = sessionManager.getSession(sessionKey);
-  if (!session) {
-    await ctx.reply(
-      '⚠️ No project set\\.\n\nIf the bot restarted, use `/continue` or `/resume` to restore your last session\\.\nOr use `/project` to open a project first\\.',
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
-
-  const fullPath = trimmedPath.startsWith('/')
-    ? trimmedPath
-    : path.join(session.workingDirectory, trimmedPath);
-  const workspaceRoot = getWorkspaceRoot();
-
-  if (!isPathWithinRoot(workspaceRoot, fullPath)) {
-    await ctx.reply(
-      `❌ File path must be within workspace root: \`${esc(workspaceRoot)}\``,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
-
-  if (!fs.existsSync(fullPath)) {
-    await ctx.reply(
-      `❌ File not found: \`${esc(trimmedPath)}\``,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
-
-  if (fs.statSync(fullPath).isDirectory()) {
-    await ctx.reply(
-      `❌ That's a directory, not a file: \`${esc(trimmedPath)}\``,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
-
-  const ext = path.extname(fullPath).toLowerCase();
-  if (ext !== '.md' && ext !== '.markdown') {
-    await ctx.reply(
-      '⚠️ Telegraph works best with Markdown files \\(\\.md\\)',
-      { parse_mode: 'MarkdownV2' }
-    );
-  }
-
-  await ctx.reply('📤 Creating Telegraph page\\.\\.\\.', { parse_mode: 'MarkdownV2' });
-
-  const pageUrl = await createTelegraphFromFile(fullPath);
-
-  if (pageUrl) {
-    const fileName = path.basename(fullPath);
-    await ctx.reply(
-      `📄 *${esc(fileName)}*\n\n[Open in Instant View](${esc(pageUrl)})`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  } else {
-    await ctx.reply(
-      '❌ Failed to create Telegraph page\\.',
-      { parse_mode: 'MarkdownV2' }
-    );
   }
 }
 
@@ -579,7 +409,6 @@ async function handleStreamingResponse(
     });
 
     await messageSender.finishStreaming(ctx, response.text);
-    await maybeSendVoiceReply(ctx, response.text);
 
     // Context visibility notifications
     await sendUsageFooter(ctx, response.usage);
@@ -609,7 +438,6 @@ async function handleWaitResponse(
     messageSender.stopTypingInterval(typingInterval);
 
     await messageSender.sendMessage(ctx, response.text);
-    await maybeSendVoiceReply(ctx, response.text);
 
     // Context visibility notifications
     await sendUsageFooter(ctx, response.usage);

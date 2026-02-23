@@ -1,7 +1,6 @@
 import { Context, Api, InputFile, GrammyError } from 'grammy';
 import { config } from '../config.js';
 import { processMessageForTelegram, escapeMarkdownV2, splitMessage } from './markdown.js';
-import { shouldUseTelegraph, createTelegraphPage, createTelegraphFromFile } from './telegraph.js';
 import { isTerminalUIEnabled } from './terminal-settings.js';
 import {
   getSpinnerFrame,
@@ -44,31 +43,9 @@ export class MessageSender {
   private streamStates: Map<string, StreamState> = new Map();
 
   /**
-   * Send a message with hybrid approach:
-   * - Short content: MarkdownV2 inline
-   * - Long content or tables: Telegraph page link
+   * Send a message with MarkdownV2 chunking
    */
   async sendMessage(ctx: Context, text: string): Promise<void> {
-    const keyInfo = getSessionKeyFromCtx(ctx);
-    // Check if we should use Telegraph for this content
-    if (shouldUseTelegraph(text, keyInfo?.sessionKey)) {
-      const pageUrl = await createTelegraphPage('Claude Response', text);
-
-      if (pageUrl) {
-        // Send Telegraph link with a brief summary
-        const summary = text.substring(0, 200).replace(/[#*_`\[\]]/g, '') + '...';
-        const message = `📄 *Full response available:*\n\n${escapeMarkdownV2(summary)}\n\n[Open in Instant View](${escapeMarkdownV2(pageUrl)})`;
-
-        try {
-          await ctx.reply(message, { parse_mode: 'MarkdownV2' });
-          return;
-        } catch (error) {
-          console.error('[Telegraph] Failed to send link, falling back to chunks:', error);
-        }
-      }
-    }
-
-    // Default: MarkdownV2 with chunking
     const parts = processMessageForTelegram(text, config.MAX_MESSAGE_LENGTH);
 
     for (const part of parts) {
@@ -114,14 +91,14 @@ export class MessageSender {
   }
 
   /**
-   * Send a markdown file with Telegraph preview option
+   * Send a markdown file as a document or inline
    */
   async sendMarkdownFile(
     ctx: Context,
     filePath: string,
-    options: { useTelegraph?: boolean; sendAsDocument?: boolean } = {}
+    options: { sendAsDocument?: boolean } = {}
   ): Promise<boolean> {
-    const { useTelegraph = true, sendAsDocument = false } = options;
+    const { sendAsDocument = false } = options;
 
     try {
       if (!fs.existsSync(filePath)) {
@@ -129,33 +106,14 @@ export class MessageSender {
         return false;
       }
 
-      const fileName = path.basename(filePath);
       const content = fs.readFileSync(filePath, 'utf-8');
 
-      // Option 1: Telegraph (Instant View)
-      if (useTelegraph) {
-        const pageUrl = await createTelegraphFromFile(filePath);
-
-        if (pageUrl) {
-          const message = `📄 *${escapeMarkdownV2(fileName)}*\n\n[Open in Instant View](${escapeMarkdownV2(pageUrl)})`;
-
-          await ctx.reply(message, { parse_mode: 'MarkdownV2' });
-
-          // Also send as document if requested
-          if (sendAsDocument) {
-            await this.sendDocument(ctx, filePath, 'Download file');
-          }
-
-          return true;
-        }
-      }
-
-      // Option 2: Send as document
       if (sendAsDocument) {
+        const fileName = path.basename(filePath);
         return await this.sendDocument(ctx, filePath, `📎 ${fileName}`);
       }
 
-      // Option 3: Send content inline
+      // Send content inline
       await this.sendMessage(ctx, content);
       return true;
     } catch (error) {
@@ -332,8 +290,6 @@ export class MessageSender {
         console.warn(`[Terminal] Rate limited, backing off for ${retryAfter}s (session:${state.sessionKey})`);
         return;
       }
-      // Ignore "message not modified" and "message ID invalid" errors
-      // The latter happens when streaming ends and message is replaced
       if (error instanceof Error) {
         const msg = error.message.toLowerCase();
         if (!msg.includes('message is not modified') && !msg.includes('message_id_invalid')) {
@@ -387,31 +343,7 @@ export class MessageSender {
       state.currentOperation = null;
 
       if (state.messageId) {
-        // Check if we should use Telegraph for final content
-        if (shouldUseTelegraph(finalContent, sessionKey)) {
-          const pageUrl = await createTelegraphPage('Claude Response', finalContent);
-
-          if (pageUrl) {
-            try {
-              const summary = finalContent.substring(0, 200).replace(/[#*_`\[\]]/g, '') + '...';
-              const message = `📄 *Response ready:*\n\n${escapeMarkdownV2(summary)}\n\n[Open in Instant View](${escapeMarkdownV2(pageUrl)})`;
-
-              await ctx.api.editMessageText(
-                chatId,
-                state.messageId,
-                message,
-                { parse_mode: 'MarkdownV2' }
-              );
-
-              this.streamStates.delete(sessionKey);
-              return;
-            } catch (error) {
-              console.error('[Telegraph] Failed, falling back to chunks:', error);
-            }
-          }
-        }
-
-        // Default: MarkdownV2 with chunking
+        // MarkdownV2 with chunking
         const parts = processMessageForTelegram(finalContent, config.MAX_MESSAGE_LENGTH);
 
         try {
@@ -443,7 +375,7 @@ export class MessageSender {
               console.debug('[Stream] Edit skipped — content unchanged');
             } else {
               // MarkdownV2 failed — delete streaming placeholder and
-              // re-send via sendMessage which handles Telegraph + chunking
+              // re-send via sendMessage which handles chunking
               console.error('MarkdownV2 edit failed, falling back to sendMessage:', mdError);
               try {
                 await ctx.api.deleteMessage(chatId, state.messageId);

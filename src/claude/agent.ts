@@ -88,62 +88,6 @@ Guidelines:
 - If a task requires multiple steps, execute them and summarize what you did
 - When you can't do something, explain why briefly`;
 
-const TELEGRAPH_FORMATTING = `
-
-Response Formatting — Telegraph-Aware Writing:
-Your responses are displayed via Telegram. Short responses render inline as MarkdownV2.
-Longer responses (2500+ chars) are published as Telegraph (telegra.ph) Instant View pages.
-You MUST write with Telegraph's rendering constraints in mind at all times.
-
-Telegraph supports ONLY these elements:
-- Headings: h3 (from # and ##) and h4 (from ### and ####). No h1, h2, h5, h6.
-- Text formatting: **bold**, *italic*, ~~strikethrough~~, \`inline code\`
-- Links: [text](url)
-- Lists: unordered (- item) and ordered (1. item). Nested lists are supported (indent sub-items).
-- Code blocks: \`\`\`code\`\`\` — rendered as monospace preformatted text. No syntax highlighting.
-- Blockquotes: > text
-- Horizontal rules: ---
-
-Telegraph does NOT support:
-- TABLES — pipe-delimited markdown tables (|col|col|) will NOT render as tables. They break into ugly labeled text. NEVER use markdown tables.
-- No checkboxes, footnotes, or task lists
-- No custom colors, fonts, or inline styles
-- Only two heading levels (h3, h4)
-
-Instead of tables, use these alternatives (in order of preference):
-1. Bullet lists with bold labels — best for key-value data or comparisons:
-   - **Name**: Alice
-   - **Age**: 30
-   - **City**: NYC
-
-2. Nested lists — best for grouped/categorized data:
-   - **Frontend**
-     - React 18
-     - TypeScript
-   - **Backend**
-     - Node.js
-     - Express
-
-3. Bold headers with list items — best for feature/comparison matrices:
-   **Telegram bot** — Grammy v1.31
-   **AI agent** — Claude Code SDK v1.0
-   **TTS** — OpenAI gpt-4o-mini-tts
-
-4. Preformatted code blocks — ONLY for data where alignment matters (ASCII tables):
-   \`\`\`
-   Name      Age   City
-   Alice     30    NYC
-   Bob       25    London
-   \`\`\`
-   Note: code blocks lose all formatting (no bold, links, etc.) so only use when alignment is critical.
-
-Structure guidelines for long responses:
-- Use ## or ### headings to create clear sections (renders as h3/h4)
-- Use --- horizontal rules to separate major sections
-- Use bullet lists liberally — they render cleanly
-- Use > blockquotes for callouts, warnings, or important notes
-- Keep paragraphs concise; Telegraph renders best with short blocks of text
-- Nest sub-items under list items for tree-like structures instead of indented text`;
 
 const INLINE_FORMATTING = `
 
@@ -163,49 +107,7 @@ Instead of tables (which don't render well in Telegram), use bullet lists with b
 - **Age**: 30
 - **City**: NYC`;
 
-const BASE_SYSTEM_PROMPT = CORE_GUIDELINES + (config.TELEGRAPH_ENABLED ? TELEGRAPH_FORMATTING : INLINE_FORMATTING);
-
-const REDDIT_TOOL_PROMPT = `
-
-Reddit Tool:
-You have a claudegram_fetch_reddit MCP tool that fetches Reddit content directly (subreddits, posts with comments, user profiles).
-Use it when the user asks about Reddit content — no need to tell them to use a command.
-The tool accepts a target (r/<subreddit>, u/<username>, post URL, post ID) and optional sort/time/limit/depth parameters.
-
-Semantic mappings for natural language Reddit queries:
-- "today" / "today's top" → sort: top, time_filter: day
-- "newest" / "latest" / "recent" → sort: new
-- "hottest" / "trending" / "what's hot" → sort: hot
-- "top" / "best" → sort: top
-- "this week" → sort: top, time_filter: week
-- "this month" → sort: top, time_filter: month
-- "rising" → sort: rising
-
-The user also has a /reddit Telegram command for direct use.`;
-
-const REDDIT_VIDEO_TOOL_PROMPT = `
-
-Reddit Video Tool:
-The user can download Reddit-hosted videos via the /vreddit Telegram command.
-If the user wants a video file, tell them to use /vreddit with the post URL.
-The claudegram_fetch_reddit tool is for text/comments only, not media downloads.`;
-
-const MEDIUM_TOOL_PROMPT = `
-
-Medium Tool:
-You have a claudegram_fetch_medium MCP tool that fetches Medium articles (bypasses paywall via Freedium).
-Use it when the user shares a Medium URL or asks to read an article — no need to tell them to use a command.
-The user also has a /medium Telegram command for direct use.`;
-
-const EXTRACT_TOOL_PROMPT = `
-
-Media Extract Tool:
-You have a claudegram_extract_media MCP tool that extracts content from YouTube, Instagram, and TikTok URLs.
-Use mode "text" to transcribe videos, "audio" for MP3, "video" for MP4, "all" for everything.
-Audio/video files are sent directly to the user via Telegram as a side effect.
-Use it when the user asks to transcribe, download, or extract media from a URL — no need to tell them to use a command.
-For voice notes sent directly in chat, the user should use /transcribe instead.
-The user also has an /extract Telegram command for direct use.`;
+const BASE_SYSTEM_PROMPT = CORE_GUIDELINES + INLINE_FORMATTING;
 
 const REASONING_SUMMARY_INSTRUCTIONS = `
 
@@ -215,14 +117,7 @@ Reasoning Summary (required when enabled):
 - Do NOT reveal chain-of-thought, hidden reasoning, or sensitive tool outputs.
 - Skip the summary for very short acknowledgements or pure error messages.`;
 
-const TOOL_PROMPTS = [
-  config.REDDIT_ENABLED ? REDDIT_TOOL_PROMPT : '',
-  config.VREDDIT_ENABLED ? REDDIT_VIDEO_TOOL_PROMPT : '',
-  config.MEDIUM_ENABLED ? MEDIUM_TOOL_PROMPT : '',
-  config.EXTRACT_ENABLED ? EXTRACT_TOOL_PROMPT : '',
-].join('');
-
-const SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}${TOOL_PROMPTS}${config.CLAUDE_REASONING_SUMMARY ? REASONING_SUMMARY_INSTRUCTIONS : ''}`;
+const SYSTEM_PROMPT = `${BASE_SYSTEM_PROMPT}${config.CLAUDE_REASONING_SUMMARY ? REASONING_SUMMARY_INSTRUCTIONS : ''}`;
 
 /**
  * Strip the "Reasoning Summary" section from the end of a response

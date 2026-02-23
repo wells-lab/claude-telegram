@@ -1,0 +1,13 @@
+services:
+  claude-telegram:
+    build: .
+    container_name: claude-telegram
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /home/hzwells:/workspace:rw
+    environment:
+      - WORKSPACE_DIR=/workspace
+      - BOT_MODE=prod
+      - STREAMING_MODE=streaming
+      - DANGEROUS_MODE=true
